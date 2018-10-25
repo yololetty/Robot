@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>故障机器人地理位置查询</title>
+    <script src="js/common.js"></script>
+    <script src="http://api.map.baidu.com/api?v=2.0&ak=NGuVYcvCy4dCBsaYXlAVbYZqsScW7bQ2"></script>
+    <style>
+        /* 搜索栏的样式 */
+        #page-search {
+            padding: 10px;
+            background: #f8f9fa;
+            color: #666;
+            border-radius: 4px;
+        }
+        #date {
+            padding: 4px 0;
+            border-radius: 3px;
+            border: 1px solid #666;
+            color: #666;
+        }
+        #btn_addr {
+            padding: 4px 20px;
+            margin-left: 5px;
+            background: #00b7ee;
+            color: #fff;
+            border: 1px solid #00b7ee;
+            border-radius: 3px;
+        }
+        /* 具体内容 */
+        #addr-list thead th{
+            padding: 4px 8px;
+            background: #f0f3f6;
+            color: #333;
+            line-height: 24px;
+            font-weight: 400;
+            text-align: left;
+        }
+        #addr-list tbody td {
+            padding: 4px 5px;
+            border-top :1px solid #f0f3f6;
+            color: #606060;
+            line-height: 28px;
+        }
+    </style>
+</head>
+<body>
+    <div id="page-title">
+        <h2>故障机器人地理位置查询</h2>
+    </div>
+    <!-- 搜索栏 -->
+    <div id="page-search"> 
+        选择日期：<input type="date" name="date" id="date" style="width:280px;">
+        <input type="button" value="查询" onclick="getAddress()" id="btn_addr">
+        <span id="show_date"></span>
+    </div>
+    <!-- 具体内容 -->
+    <table id="addr-list" width="100%" border="0">
+        <thead>
+            <th width="70">机器人型号</th>
+            <th width="150">具体位置</th>
+        </thead>
+        <tbody id="address">
+        </tbody>
+    </table>
+    <script>
+        function getAddress(){
+            var date = $("date").value;
+            if(!date){
+                $("show_addr").innerHTML = "请选择指定日期来查询故障机器人";
+                $("btn_addr").disabled = true;
+            }else{
+                function ajax(){
+                    return new Promise((resolve,reject)=>{
+                        // 1.创建对象
+                        var xhr = createXhr();
+                        // 2.监听事件
+                        xhr.onreadystatechange = function(){
+                            if(xhr.readyState==4 && xhr.status==200){
+                                // 获取从服务端得到的json数据
+                                var txt = xhr.responseText;
+                                console.log(txt);
+                                // 将json数据转换为js数据
+                                var res = JSON.parse(txt);
+                                console.log(res);
+                                //console.log(res.length);
+
+                                //创建地理编码（地理解析器）实例
+                                var myGeo = new BMap.Geocoder();
+                                var newArr = [];
+                                var index = 0;
+                                var GEO = function (){
+                                    //console.log(res);
+                                    var promise = new Promise((resolve,reject)=>{
+                                        //console.log(res);
+                                        //console.log(res[index]);
+                                        // 将数据库中获取的GPS坐标字符串分割组成数组
+                                        var addr = res[index].address.split(","); 
+                                        //console.log(addr);
+                                        var lng = addr[1],lat=addr[0];
+                                        var point = new BMap.Point(lng,lat);
+                                        //console.log(point);
+                                        //Arr.push(point);
+                                        if(index < res.length -1){
+                                            setTimeout(GEO,100);
+                                        }
+                                        // 根据坐标得到地址描述
+                                        myGeo.getLocation(point,(result)=>{
+                                            newArr.push(result.address);
+                                            //console.log(result.address);
+                                            //resolve(newArr);
+                                            //console.log(newArr);
+                                            //$("new_addr").innerHTML += result.address;
+                                        });
+                                        //console.log(newArr);
+                                        index++;
+                                        resolve(newArr);
+                                    });
+                                    return promise;
+                                }
+                                GEO().then(function(newArr){
+                                    res.newaddr = newArr;
+                                    console.log(res);
+                                    resolve(res);
+                                })
+                            }
+                        }
+                        // 3.打开链接
+                        xhr.open("get","/address/search?date="+date,true);
+                        // 4.发送请求
+                        xhr.send(null);
+                    });
+                }
+                ajax()
+                    .then(function(res){
+                        setTimeout(()=>{
+                            var html="";
+                            //console.log(res);
+                            for(var i=0;i<res.length;i++){
+                                var robot = res[i];
+                                var address = res.newaddr;
+                                //console.log(address);
+                                //console.log(robot);
+                                html += "<tr>";
+                                    html += "<td>" + robot.rname + "</td>";
+                                    html += "<td>"+ address[i] +"</td>";
+                                html += "</tr>";
+                                
+                            }
+                            //console.log(html);
+                            $("address").innerHTML = html;
+                        },2500);
+                        
+                    });
+            }
+        }
+    </script>
+</body>
+</html>
